@@ -1,0 +1,124 @@
+#include <iostream>
+#include <thread>
+#include <vector>
+#include <algorithm>
+#include <chrono>
+
+// Fill vector wiht random integers (in interval from 0 to 100)
+// Clear vector if it was full already
+void create_rand_vec(std::vector<int>& v, int size){
+	
+	srand(time(NULL));
+	int num = 0;
+	
+	if (!v.empty())
+	    v.clear();
+	
+	for (int i = 0; i < size; i++){
+	    num = 0 + rand()%101;
+		v.push_back(num);
+	}
+}
+
+// Print vector
+void print_vec(std::vector<int>& v){
+	for (int i = 0; i < v.size(); i++){
+		std::cout << v[i];
+		if (v[i] < 10)
+		    std::cout << "   ";
+		else if (v[i] < 100)
+		    std::cout << "  ";
+		else if (v[i] == 100)
+		    std::cout << " ";
+		if ( i != 0 && (i+1)%10 == 0)
+		    std::cout << std::endl;
+	}
+}
+
+// Calculate sum of part of vector (from start position to finish position)
+// Put result to vector "sum" (position "sum_pos")
+void calc_sum_part(std::vector<int>& v, int start, int finish, std::vector<int>& sum, int sum_pos){
+	int num = 0;
+	for (int i = start; i <= finish; i++)
+	    num += v[i];
+	sum[sum_pos] += num;
+}
+
+// Calculate summary of part of vector (from start position to finish position)
+// Use to calculate sum without threads
+int calc_sum(std::vector<int>& v, int begin, int end){
+	int sum = 0;
+	for (int i = begin; i <= end; i++)
+	    sum += v[i];
+	return sum;
+}
+
+int main(int argc, char** argv) {
+	
+	// Variables
+	std::vector<int> vec; // vector it's summ of elements are need to calculate
+	int size = 0;         // size of vector of integers (set by user)
+	int threads_num = 0;  // numbers of threads (set by user)
+	int thread_size = 0;  // size of each thread (calculating)
+	long long sum = 0;    // result value of sum
+	
+	// Set vector size, number of threads and it's size
+	std::cout << "Input vector size (no more than 10 000 000):\n";
+	std::cin >> size;
+	std::cout << "Input number of threads:\n";
+	std::cin >> threads_num;
+	thread_size = size/threads_num;
+	
+	// Storage of parts of sum
+	std::vector<int> part_of_sum;
+	for (int i = 0; i < threads_num; i++)
+	    part_of_sum.push_back(0);
+	
+	// Create vector of integers
+	create_rand_vec(vec, size);
+	
+	// Print integers if needed
+	//print_vec(vec);
+	//std::cout << std::endl;
+
+	// Create and execute threads
+	
+	/* start clock */ auto start = std::chrono::steady_clock::now(); 
+	
+	std::vector<std::thread> threads;
+	for (int i = 0; i < threads_num; i++){
+		if (i != threads_num - 1)
+		    threads.push_back(std::thread (calc_sum_part, std::ref(vec), i*thread_size, i*thread_size+thread_size-1,
+		                               std::ref(part_of_sum), i));
+		// for last thread
+		// protect in situations when size of this thread are not equal to all others
+		else
+		    threads.push_back(std::thread (calc_sum_part, std::ref(vec), i*thread_size, size-1,
+		                               std::ref(part_of_sum), i));
+	}
+	std::for_each(threads.begin(), threads.end(), [] (std::thread &t) {t.join();});
+	
+	// Calculate result sum
+	for (int i = 0; i < part_of_sum.size(); i ++)
+	    sum += part_of_sum[i];
+	std::cout << sum << std::endl;
+	
+	/* stop clock */ auto end = std::chrono::steady_clock::now();
+	
+	std::cout << threads_num << " threads calculate sum for " <<
+	             std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "msec\n";
+	
+	// Calculate sum without threads
+	
+	/* start clock */ start = std::chrono::steady_clock::now(); 
+	
+	sum = calc_sum(vec, 0, size-1);
+	std::cout << sum << std::endl;
+	
+	/* stop clock */ end = std::chrono::steady_clock::now();
+	
+	std::cout << "Without threads calculate sum for " <<
+	             std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "msec\n";
+	
+	return 0;
+}
